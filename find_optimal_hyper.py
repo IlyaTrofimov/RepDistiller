@@ -20,14 +20,14 @@ if distill_type == 'crd':
     param_values = [[0.02, 0.05, 0.1, 0.2], [0.5, 1.0, 2.0, 4.0]]
 elif distill_type == 'pkt':
     param_names = ['beta']
-    param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3]]
+    param_values = [[0.75e4, 1.5e4, 3e4, 6e4, 12e4]]
 elif distill_type == 'similarity':
     param_names = ['beta']
-    param_values = [[0.75e4, 1.5e4, 3e4, 6e4, 12e4]]
+    param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3]]
 elif distill_type == 'vid':
     param_names = ['beta']
     param_values = [[0.25, 0.5, 1, 2, 4]]
-elif distill_type == 'at':
+elif distill_type == 'attention':
     param_names = ['beta']
     param_values = [[0.25e3, 0.5e3, 1e3, 2e3, 4e3]]
 elif distill_type == 'nst':
