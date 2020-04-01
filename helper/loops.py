@@ -6,7 +6,6 @@ import torch
 
 from .util import AverageMeter, accuracy
 
-
 def train_vanilla(epoch, train_loader, model, criterion, optimizer, opt):
     """vanilla training"""
     model.train()
@@ -112,13 +111,22 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         if opt.distill in ['abound']:
             preact = True
         feat_s, logit_s = model_s(input, is_feat=True, preact=preact)
-        with torch.no_grad():
-            feat_t, logit_t = model_t(input, is_feat=True, preact=preact)
-            feat_t = [f.detach() for f in feat_t]
+
+        is_vanilla = (opt.alpha == 0) and (opt.beta == 0)
+
+        if not is_vanilla:
+            with torch.no_grad():
+                feat_t, logit_t = model_t(input, is_feat=True, preact=preact)
+                feat_t = [f.detach() for f in feat_t]
+        else:
+            feat_t = logit_t = None
 
         # cls + kl div
         loss_cls = criterion_cls(logit_s, target)
-        loss_div = criterion_div(logit_s, logit_t)
+        if opt.alpha:
+            loss_div = criterion_div(logit_s, logit_t)
+        else:
+            loss_div = 0
 
         # other kd beyond KL divergence
         if opt.distill == 'kd':
@@ -181,7 +189,10 @@ def train_distill(epoch, train_loader, module_list, criterion_list, optimizer, o
         else:
             raise NotImplementedError(opt.distill)
 
-        loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd
+        if is_vanilla:
+            loss = loss_cls
+        else:
+            loss = opt.gamma * loss_cls + opt.alpha * loss_div + opt.beta * loss_kd
 
         acc1, acc5 = accuracy(logit_s, target, topk=(1, 5))
         losses.update(loss.item(), input.size(0))
@@ -227,8 +238,7 @@ def validate(val_loader, model, criterion, opt):
 
     with torch.no_grad():
         end = time.time()
-        for idx, (input, target) in enumerate(val_loader):
-
+        for idx, (input, target, indices) in enumerate(val_loader):
             input = input.float()
             if torch.cuda.is_available():
                 input = input.cuda()
