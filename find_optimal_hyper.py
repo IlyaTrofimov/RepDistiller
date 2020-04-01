@@ -5,7 +5,7 @@ import itertools, functools
 distill_type = sys.argv[1]
 gpu = int(sys.argv[2])
 
-def crd_hyper_gen():
+def hyper_gen():
 
     configs = [None] * (len(param_names) + 1)
     configs[0] = ['--arc %d' % arc for arc in range(20)]
@@ -20,7 +20,19 @@ if distill_type == 'crd':
     param_values = [[0.02, 0.05, 0.1, 0.2], [0.5, 1.0, 2.0, 4.0]]
 elif distill_type == 'pkt':
     param_names = ['beta']
-    param_values = [[0.75e5, 1.5e5, 3e5, 6e5, 12e5]]
+    param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3]]
+elif distill_type == 'similarity':
+    param_names = ['beta']
+    param_values = [[0.75e4, 1.5e4, 3e4, 6e4, 12e4]]
+elif distill_type == 'vid':
+    param_names = ['beta']
+    param_values = [[0.25, 0.5, 1, 2, 4]]
+elif distill_type == 'at':
+    param_names = ['beta']
+    param_values = [[0.25e3, 0.5e3, 1e3, 2e3, 4e3]]
+elif distill_type == 'nst':
+    param_names = ['beta']
+    param_values = [[12.5, 25, 50, 100, 200]]
 
 if __name__ == '__main__':
 
@@ -29,9 +41,7 @@ if __name__ == '__main__':
     A = [len(x) for x in param_values]
     configs_num = functools.reduce(lambda x, y: x*y, A)
 
-    gen = crd_hyper_gen
-
-    for elem in gen():
+    for elem in hyper_gen():
         s = ' '.join(elem)
         print('')
         print(s)
