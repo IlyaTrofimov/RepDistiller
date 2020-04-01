@@ -8,13 +8,15 @@ import os
 import argparse
 import socket
 import time
+import pickle
+import pathlib
+import json
 
 import tensorboard_logger as tb_logger
 import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
-
 
 from models import model_dict
 from models.util import Embed, ConvReg, LinearEmbed
@@ -31,6 +33,7 @@ from crd.criterion import CRDLoss
 from helper.loops import train_distill as train, validate
 from helper.pretrain import init
 
+from models.mobilenetv2_trofim import MobileNetV2
 
 def parse_option():
 
@@ -41,7 +44,7 @@ def parse_option():
     parser.add_argument('--print_freq', type=int, default=100, help='print frequency')
     parser.add_argument('--tb_freq', type=int, default=500, help='tb frequency')
     parser.add_argument('--save_freq', type=int, default=40, help='save frequency')
-    parser.add_argument('--batch_size', type=int, default=64, help='batch_size')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch_size')
     parser.add_argument('--num_workers', type=int, default=8, help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=240, help='number of training epochs')
     parser.add_argument('--init_epochs', type=int, default=30, help='init training for two-stage methods')
@@ -61,7 +64,7 @@ def parse_option():
                         choices=['resnet8', 'resnet14', 'resnet20', 'resnet32', 'resnet44', 'resnet56', 'resnet110',
                                  'resnet8x4', 'resnet32x4', 'wrn_16_1', 'wrn_16_2', 'wrn_40_1', 'wrn_40_2',
                                  'vgg8', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'ResNet50',
-                                 'MobileNetV2', 'ShuffleV1', 'ShuffleV2'])
+                                 'MobileNetV2', 'MobileNetV2Trofim', 'ShuffleV1', 'ShuffleV2'])
     parser.add_argument('--path_t', type=str, default=None, help='teacher model snapshot')
 
     # distillation
@@ -86,6 +89,10 @@ def parse_option():
 
     # hint layer
     parser.add_argument('--hint_layer', default=2, type=int, choices=[0, 1, 2, 3, 4])
+    parser.add_argument('--gpu', default=0, type=int)
+    parser.add_argument('--prefix', default=None, type=str, help='log prefix')
+    parser.add_argument('--arc', default=None, type=int)
+    parser.add_argument('--part', default=1, type=int)
 
     opt = parser.parse_args()
 
@@ -106,7 +113,8 @@ def parse_option():
     for it in iterations:
         opt.lr_decay_epochs.append(int(it))
 
-    opt.model_t = get_teacher_name(opt.path_t)
+    #opt.model_t = get_teacher_name(opt.path_t)
+    opt.model_t = 'MobileNetV2Trofim'
 
     opt.model_name = 'S:{}_T:{}_{}_{}_r:{}_a:{}_b:{}_{}'.format(opt.model_s, opt.model_t, opt.dataset, opt.distill,
                                                                 opt.gamma, opt.alpha, opt.beta, opt.trial)
@@ -148,24 +156,44 @@ def main():
     # tensorboard logger
     logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
 
+    seed = 8
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.set_device(opt.gpu)
+
+    with open('random_arcs2.pickle', 'rb') as infile:
+        obj = pickle.load(infile)
+
+    arcs = obj[0:100]
+
     # dataloader
     if opt.dataset == 'cifar100':
         if opt.distill in ['crd']:
-            train_loader, val_loader, n_data = get_cifar100_dataloaders_sample(batch_size=opt.batch_size,
+            train_loader, val_loader, test_loader, n_data = get_cifar100_dataloaders_sample(batch_size=opt.batch_size,
                                                                                num_workers=opt.num_workers,
                                                                                k=opt.nce_k,
-                                                                               mode=opt.mode)
+                                                                               mode=opt.mode, part = opt.part)
         else:
-            train_loader, val_loader, n_data = get_cifar100_dataloaders(batch_size=opt.batch_size,
+            train_loader, val_loader, test_loader, n_data = get_cifar100_dataloaders(batch_size=opt.batch_size,
                                                                         num_workers=opt.num_workers,
-                                                                        is_instance=True)
+                                                                        is_instance=True, part = opt.part)
         n_cls = 100
     else:
         raise NotImplementedError(opt.dataset)
 
+    print(n_data)
+
     # model
-    model_t = load_teacher(opt.path_t, n_cls)
-    model_s = model_dict[opt.model_s](num_classes=n_cls)
+    #model_t = load_teacher(opt.path_t, n_cls)
+    model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
+    model_t = MobileNetV2(num_classes = 100, first_stride = 1)
+    model_t.load_state_dict(torch.load(model_t_path))
+
+    #model_s = model_dict[opt.model_s](num_classes=n_cls)
+
+    arc = arcs[opt.arc]
+    model_s = MobileNetV2(num_classes = 100, first_stride = 1,\
+                                    inverted_residual_setting = arc[:-1], last_channel = arc[-1][1])
 
     data = torch.randn(2, 3, 32, 32)
     model_t.eval()
@@ -270,10 +298,13 @@ def main():
     criterion_list.append(criterion_kd)     # other knowledge distillation loss
 
     # optimizer
-    optimizer = optim.SGD(trainable_list.parameters(),
-                          lr=opt.learning_rate,
-                          momentum=opt.momentum,
-                          weight_decay=opt.weight_decay)
+    #optimizer = optim.SGD(trainable_list.parameters(),
+    #                      lr=opt.learning_rate,
+    #                      momentum=opt.momentum,
+    #                      weight_decay=opt.weight_decay)
+
+    optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 5e-4)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.epochs)
 
     # append teacher after optimizer to avoid weight_decay
     module_list.append(model_t)
@@ -287,61 +318,80 @@ def main():
     teacher_acc, _, _ = validate(val_loader, model_t, criterion_cls, opt)
     print('teacher accuracy: ', teacher_acc)
 
+    history = {"loss": [], "acc": [], "test_loss": [], "test_acc": [], "wall_time" : [], "val_loss" : [], "val_acc" : []}
+    wall_time = 0.0
+
     # routine
     for epoch in range(1, opt.epochs + 1):
 
-        adjust_learning_rate(epoch, opt, optimizer)
+        #adjust_learning_rate(epoch, opt, optimizer)
         print("==> training...")
 
         time1 = time.time()
         train_acc, train_loss = train(epoch, train_loader, module_list, criterion_list, optimizer, opt)
+        scheduler.step()
         time2 = time.time()
+        wall_time += time2 - time1
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
 
-        logger.log_value('train_acc', train_acc, epoch)
-        logger.log_value('train_loss', train_loss, epoch)
+        val_acc, val_acc_top5, val_loss = validate(val_loader, model_s, criterion_cls, opt)
+        test_acc, tect_acc_top5, test_loss = validate(test_loader, model_s, criterion_cls, opt)
 
-        test_acc, tect_acc_top5, test_loss = validate(val_loader, model_s, criterion_cls, opt)
+        history['test_loss'].append(test_loss)
+        history['test_acc'].append(test_acc.item())
 
-        logger.log_value('test_acc', test_acc, epoch)
-        logger.log_value('test_loss', test_loss, epoch)
-        logger.log_value('test_acc_top5', tect_acc_top5, epoch)
+        history['val_loss'].append(val_loss)
+        history['val_acc'].append(val_acc.item())
+
+        history['wall_time'].append(wall_time)
 
         # save the best model
-        if test_acc > best_acc:
-            best_acc = test_acc
-            state = {
-                'epoch': epoch,
-                'model': model_s.state_dict(),
-                'best_acc': best_acc,
-            }
-            save_file = os.path.join(opt.save_folder, '{}_best.pth'.format(opt.model_s))
-            print('saving the best model!')
-            torch.save(state, save_file)
+        #if test_acc > best_acc:
+        #    best_acc = test_acc
+        #    state = {
+        #        'epoch': epoch,
+        #        'model': model_s.state_dict(),
+        #        'best_acc': best_acc,
+        #    }
+        #    save_file = os.path.join(opt.save_folder, '{}_best.pth'.format(opt.model_s))
+        #    print('saving the best model!')
+        #    torch.save(state, save_file)
 
         # regular saving
-        if epoch % opt.save_freq == 0:
-            print('==> Saving...')
-            state = {
-                'epoch': epoch,
-                'model': model_s.state_dict(),
-                'accuracy': test_acc,
-            }
-            save_file = os.path.join(opt.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
-            torch.save(state, save_file)
+        #if epoch % opt.save_freq == 0:
+        #    print('==> Saving...')
+        #    state = {
+        #        'epoch': epoch,
+        #        'model': model_s.state_dict(),
+        #        'accuracy': test_acc,
+        #    }
+        #    save_file = os.path.join(opt.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
+        #    torch.save(state, save_file)
 
     # This best accuracy is only for printing purpose.
-    # The results reported in the paper/README is from the last epoch. 
-    print('best accuracy:', best_acc)
+    # The results reported in the paper/README is from the last epoch.
+    #print('best accuracy:', best_acc)
+
+    path = 'results/%s_%d' % (opt.prefix, opt.arc)
+    path = pathlib.Path(path)
+
+    if not os.path.exists(path.parent):
+        os.makedirs(path.parent)
+
+    model_path = path.with_suffix(".pth")
+    history_path = path.with_name(path.name + "_history").with_suffix(".json")
+
+    torch.save(model_s.state_dict(), model_path)
+    with open(history_path, 'w') as f:
+        f.write(json.dumps(history))
 
     # save model
-    state = {
-        'opt': opt,
-        'model': model_s.state_dict(),
-    }
-    save_file = os.path.join(opt.save_folder, '{}_last.pth'.format(opt.model_s))
-    torch.save(state, save_file)
-
+    #state = {
+    #    'opt': opt,
+    #    'model': model_s.state_dict(),
+    #}
+    #save_file = os.path.join(opt.save_folder, '{}_last.pth'.format(opt.model_s))
+    #torch.save(state, save_file)
 
 if __name__ == '__main__':
     main()

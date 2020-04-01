@@ -3,6 +3,7 @@ from .resnetv2 import ResNet50
 from .wrn import wrn_16_1, wrn_16_2, wrn_40_1, wrn_40_2
 from .vgg import vgg19_bn, vgg16_bn, vgg13_bn, vgg11_bn, vgg8_bn
 from .mobilenetv2 import mobile_half
+from .mobilenetv2_trofim import MobileNetV2
 from .ShuffleNetv1 import ShuffleV1
 from .ShuffleNetv2 import ShuffleV2
 
@@ -27,6 +28,7 @@ model_dict = {
     'vgg16': vgg16_bn,
     'vgg19': vgg19_bn,
     'MobileNetV2': mobile_half,
+    'MobileNetV2Trofim': MobileNetV2,
     'ShuffleV1': ShuffleV1,
     'ShuffleV2': ShuffleV2,
 }
