@@ -32,7 +32,7 @@ elif distill_type == 'similarity':
 elif distill_type == 'vid':
     param_names = ['beta']
     param_values = [[0.25, 0.5, 1, 2, 4]]
-elif distill_type == 'at':
+elif distill_type == 'attention':
     param_names = ['beta']
     param_values = [[0.25e3, 0.5e3, 1e3, 2e3, 4e3]]
 elif distill_type == 'nst':
