@@ -39,16 +39,19 @@ elif distill_type == 'pkt':
     param_done = [[1,         1,     1,   1,    1,   0,    0,    0  ]]
 elif distill_type == 'similarity':
     param_names = ['beta']
-    param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3]]
+    param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3, 0.37e3, 0.18e3, 0.09e3]]
+    param_done = [[1,         1,     1,   1,    1,   0,    0,       0  ]]
 elif distill_type == 'vid':
     param_names = ['beta']
-    param_values = [[0.25, 0.5, 1, 2, 4]]
+    param_values = [[0.25, 0.5, 1, 2, 4, 8, 16, 32]]
+    param_done = [[1,       1,  1, 1, 1, 0,  0,  0]]
 elif distill_type == 'attention':
     param_names = ['beta']
     param_values = [[0.25e3, 0.5e3, 1e3, 2e3, 4e3]]
 elif distill_type == 'nst':
     param_names = ['beta']
-    param_values = [[12.5, 25, 50, 100, 200]]
+    param_values = [[12.5, 25, 50, 100, 200, 6, 3, 1.5]]
+    param_done = [[1,      1,   1,   1,   1, 0, 0,  0  ]]
 
 def mult(arr):
     return functools.reduce(lambda x, y: x*y, arr)
