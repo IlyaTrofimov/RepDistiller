@@ -52,6 +52,10 @@ elif distill_type == 'nst':
     param_names = ['beta']
     param_values = [[12.5, 25, 50, 100, 200, 6, 3, 1.5]]
     param_done = [[1,      1,   1,   1,   1, 0, 0,  0  ]]
+elif distill_type == 'hint':
+    param_names = ['beta']
+    param_values = [[12.5, 25, 50, 100, 200, 400, 800]]
+    param_done =  [[0,      0,   0,   0,   0,   0,  0]]
 
 def mult(arr):
     return functools.reduce(lambda x, y: x*y, arr)
