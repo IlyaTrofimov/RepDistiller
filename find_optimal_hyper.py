@@ -32,7 +32,10 @@ def done_gen():
 
 if distill_type == 'crd':
     param_names = ['nce_t', 'beta']
+    #param_values = [[0.02, 0.05, 0.1, 0.2, 0.4, 0.8], [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]]
+    #param_done =   [[1,       1,   1,   1,   0,   0], [  1,   1,   1,   1,   0,    0]]
     param_values = [[0.02, 0.05, 0.1, 0.2], [0.5, 1.0, 2.0, 4.0]]
+    param_done =   [[1,       1,   1,   1], [  1,   1,   1,   1]]
 elif distill_type == 'pkt':
     param_names = ['beta']
     param_values = [[0.75e4, 1.5e4, 3e4, 6e4, 12e4, 24e4, 48e4, 96e4]]
@@ -56,6 +59,14 @@ elif distill_type == 'hint':
     param_names = ['beta']
     param_values = [[12.5, 25, 50, 100, 200, 400, 800]]
     param_done =  [[0,      0,   0,   0,   0,   0,  0]]
+elif distill_type == 'correlation':
+    param_names = ['beta']
+    param_values = [[0.25e-2, 0.5e-2, 1e-2, 2e-2, 4e-2, 8e-2, 16e-2, 32e-2]]
+    param_done =   [[0,            0,    0,    0,    0,    0,     0,     0]]
+else:
+    param_names = None
+    param_values = None
+    param_done = None
 
 def mult(arr):
     return functools.reduce(lambda x, y: x*y, arr)
@@ -75,6 +86,7 @@ if __name__ == '__main__':
         done = mult(DONE[i][1:])
         s = ' '.join(elem)
         print('')
+        print(cnt % configs_num)
         print(s)
         print(done)
         cmd = 'python train_student.py --gpu %d --part 9 --distill %s --model_s MobileNetV2Trofim -r 1 -a 0 --epochs 100 --nce_k 4096 %s --prefix %s_tune/%s_per11_%d_ ' % (gpu, distill_type, s, distill_type, distill_type, cnt % configs_num)
