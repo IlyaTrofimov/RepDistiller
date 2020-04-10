@@ -1,4 +1,4 @@
-    """
+"""
 the general training framework
 """
 
@@ -179,7 +179,7 @@ def main():
     print(n_data)
 
     # model
-    if path_t:
+    if opt.path_t:
         model_t = load_teacher(opt.path_t, n_cls)
     else:
         model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
