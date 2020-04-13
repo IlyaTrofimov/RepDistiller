@@ -55,12 +55,18 @@ elif distill_type == 'nst':
     param_names = ['beta']
     param_values = [[12.5, 25, 50, 100, 200, 6, 3, 1.5]]
     param_done = [[1,      1,   1,   1,   1, 0, 0,  0  ]]
+elif distill_type == 'hint':
+    param_names = ['beta']
+    param_values = [[12.5, 25, 50, 100, 200, 400, 800]]
+    param_done =  [[0,      0,   0,   0,   0,   0,  0]]
 elif distill_type == 'correlation':
     param_names = ['beta']
     param_values = [[0.25e-2, 0.5e-2, 1e-2, 2e-2, 4e-2, 8e-2, 16e-2, 32e-2]]
     param_done =   [[0,            0,    0,    0,    0,    0,     0,     0]]
-
-
+else:
+    param_names = None
+    param_values = None
+    param_done = None
 
 def mult(arr):
     return functools.reduce(lambda x, y: x*y, arr)

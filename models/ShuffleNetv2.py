@@ -100,10 +100,14 @@ class DownBlock(nn.Module):
 
 
 class ShuffleNetV2(nn.Module):
-    def __init__(self, net_size, num_classes=10):
+    def __init__(self, net_size, num_classes=10, config=None):
         super(ShuffleNetV2, self).__init__()
-        out_channels = configs[net_size]['out_channels']
-        num_blocks = configs[net_size]['num_blocks']
+        if not config:
+            out_channels = configs[net_size]['out_channels']
+            num_blocks = configs[net_size]['num_blocks']
+        else:
+            out_channels = config['out_channels']
+            num_blocks = config['num_blocks']
 
         # self.conv1 = nn.Conv2d(3, 24, kernel_size=3,
         #                        stride=1, padding=1, bias=False)

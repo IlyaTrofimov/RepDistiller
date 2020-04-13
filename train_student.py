@@ -60,7 +60,7 @@ def parse_option():
     parser.add_argument('--dataset', type=str, default='cifar100', choices=['cifar100'], help='dataset')
 
     # model
-    parser.add_argument('--model_s', type=str, default='resnet8',
+    parser.add_argument('--model_s', type=str, default='MobileNetV2Trofim',
                         choices=['resnet8', 'resnet14', 'resnet20', 'resnet32', 'resnet44', 'resnet56', 'resnet110',
                                  'resnet8x4', 'resnet32x4', 'wrn_16_1', 'wrn_16_2', 'wrn_40_1', 'wrn_40_2',
                                  'vgg8', 'vgg11', 'vgg13', 'vgg16', 'vgg19', 'ResNet50',
@@ -161,11 +161,6 @@ def main():
     torch.cuda.manual_seed(seed)
     torch.cuda.set_device(opt.gpu)
 
-    with open('random_arcs2.pickle', 'rb') as infile:
-        obj = pickle.load(infile)
-
-    arcs = obj[0:100]
-
     # dataloader
     if opt.dataset == 'cifar100':
         if opt.distill in ['crd']:
@@ -184,16 +179,35 @@ def main():
     print(n_data)
 
     # model
-    #model_t = load_teacher(opt.path_t, n_cls)
-    model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
-    model_t = MobileNetV2(num_classes = 100, first_stride = 1)
-    model_t.load_state_dict(torch.load(model_t_path))
+    if opt.path_t:
+        model_t = load_teacher(opt.path_t, n_cls)
+    else:
+        model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
+        model_t = MobileNetV2(num_classes = 100, first_stride = 1)
+        model_t.load_state_dict(torch.load(model_t_path))
 
-    #model_s = model_dict[opt.model_s](num_classes=n_cls)
+    if opt.model_s == 'MobileNetV2Trofim':
 
-    arc = arcs[opt.arc]
-    model_s = MobileNetV2(num_classes = 100, first_stride = 1,\
+        with open('random_arcs2.pickle', 'rb') as infile:
+            obj = pickle.load(infile)
+
+        arcs = obj[0:100]
+
+        arc = arcs[opt.arc]
+        model_s = MobileNetV2(num_classes = 100, first_stride = 1,\
                                     inverted_residual_setting = arc[:-1], last_channel = arc[-1][1])
+    elif opt.model_s == 'ShuffleV2':
+
+        with open('random_arcs_shufflenetv2.pickle', 'rb') as infile:
+            arcs = pickle.load(infile)
+
+        if opt.arc is None:
+            model_s = model_dict[opt.model_s](num_classes=n_cls)
+        else:
+            model_s = model_dict[opt.model_s](num_classes=n_cls, config = arcs[opt.arc])
+
+    else:
+        model_s = model_dict[opt.model_s](num_classes=n_cls)
 
     data = torch.randn(2, 3, 32, 32)
     model_t.eval()
@@ -372,7 +386,12 @@ def main():
     # The results reported in the paper/README is from the last epoch.
     #print('best accuracy:', best_acc)
 
-    path = 'results/%s_%d' % (opt.prefix, opt.arc)
+
+    if opt.arc is None:
+        path = 'results/%s_None' % opt.prefix
+    else:
+        path = 'results/%s_%d' % (opt.prefix, opt.arc)
+
     path = pathlib.Path(path)
 
     if not os.path.exists(path.parent):
