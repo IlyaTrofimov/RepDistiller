@@ -11,8 +11,8 @@ import time
 import pickle
 import pathlib
 import json
-
-import tensorboard_logger as tb_logger
+#
+#import tensorboard_logger as tb_logger
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -89,10 +89,14 @@ def parse_option():
 
     # hint layer
     parser.add_argument('--hint_layer', default=2, type=int, choices=[0, 1, 2, 3, 4])
+
+    # trofim options
     parser.add_argument('--gpu', default=0, type=int)
     parser.add_argument('--prefix', default=None, type=str, help='log prefix')
     parser.add_argument('--arc', default=None, type=int)
     parser.add_argument('--part', default=1, type=int)
+    parser.add_argument('--arcs_dir', default='.', type=str)
+    parser.add_argument('--res_dir', default='results', type=str)
 
     opt = parser.parse_args()
 
@@ -154,7 +158,8 @@ def main():
     opt = parse_option()
 
     # tensorboard logger
-    logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
+    #logger = tb_logger.Logger(logdir=opt.tb_folder, flush_secs=2)
+    logger = None
 
     seed = 8
     torch.manual_seed(seed)
@@ -180,7 +185,10 @@ def main():
 
     # model
     if opt.path_t:
-        model_t = load_teacher(opt.path_t, n_cls)
+        #model_t = load_teacher(opt.path_t, n_cls)
+        model_t_name = 'ShuffleV2'
+        model_t = model_dict[model_t_name](num_classes=n_cls)
+        model_t.load_state_dict(torch.load(opt.path_t))
     else:
         model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
         model_t = MobileNetV2(num_classes = 100, first_stride = 1)
@@ -188,7 +196,7 @@ def main():
 
     if opt.model_s == 'MobileNetV2Trofim':
 
-        with open('random_arcs2.pickle', 'rb') as infile:
+        with open(opt.arcs_dir + '/random_arcs2.pickle', 'rb') as infile:
             obj = pickle.load(infile)
 
         arcs = obj[0:100]
@@ -198,7 +206,7 @@ def main():
                                     inverted_residual_setting = arc[:-1], last_channel = arc[-1][1])
     elif opt.model_s == 'ShuffleV2':
 
-        with open('random_arcs_shufflenetv2.pickle', 'rb') as infile:
+        with open(opt.arcs_dir + '/random_arcs_shufflenetv2.pickle', 'rb') as infile:
             arcs = pickle.load(infile)
 
         if opt.arc is None:
@@ -386,11 +394,10 @@ def main():
     # The results reported in the paper/README is from the last epoch.
     #print('best accuracy:', best_acc)
 
-
     if opt.arc is None:
-        path = 'results/%s_None' % opt.prefix
+        path = '%s/%s_None' % (opt.res_dir, opt.prefix)
     else:
-        path = 'results/%s_%d' % (opt.prefix, opt.arc)
+        path = '%s/%s_%d' % (opt.res_dir, opt.prefix, opt.arc)
 
     path = pathlib.Path(path)
 
