@@ -31,6 +31,10 @@ def done_gen():
 
     return itertools.product(*configs)
 
+param_names = None
+param_values = None
+param_done = None
+
 if distill_type == 'kd':
     param_names = ['kd_T', 'alpha']
     param_values = [[1, 4, 16, 32], [0.25, 0.5, 0.75, 1.0]]
@@ -87,11 +91,15 @@ if __name__ == '__main__':
     if param_done:
         DONE = [x for x in done_gen()]
     else:
-        DONE = [0 for 0 in CONFIGS]
+        DONE = None
 
     for i in range(len(CONFIGS)):
         elem = CONFIGS[i]
-        done = mult(DONE[i][1:])
+
+        if DONE:
+            done = mult(DONE[i][1:])
+        else:
+            done = False
         s = ' '.join(elem)
         print('')
         print(cnt % configs_num)
@@ -102,7 +110,7 @@ if __name__ == '__main__':
 
         if ss == 'mobile':
             cmd = common_cmd + ' --model_s MobileNetV2Trofim --prefix %s_tune/%s_per11_%d_ ' % (distill_type, distill_type, cnt % configs_num)
-        elif ss == 'shuffle'
+        elif ss == 'shuffle':
             cmd = common_cmd + ' --model_s ShuffleV2 --path_t shufflev2_teacher.pth --prefix shuffle/%s_tune/%s_per11_%d_' % (distill_type, distill_type, cnt % configs_num)
 
         print(cmd)
