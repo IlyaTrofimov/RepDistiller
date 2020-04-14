@@ -2,10 +2,11 @@ import os
 import sys
 import itertools, functools
 
-distill_type = sys.argv[1]
-gpu = int(sys.argv[2])
+ss = sys.argv[1]
+distill_type = sys.argv[2]
+gpu = int(sys.argv[3])
 
-if len(sys.argv) >= 4:
+if len(sys.argv) >= 5:
     is_dry_run = True
 else:
     is_dry_run = False
@@ -30,39 +31,42 @@ def done_gen():
 
     return itertools.product(*configs)
 
-if distill_type == 'crd':
+if distill_type == 'kd':
+    param_names = ['kd_T', 'alpha']
+    param_values = [[1, 4, 16, 32], [0.25, 0.5, 0.75, 1.0]]
+elif distill_type == 'crd':
     param_names = ['nce_t', 'beta']
     #param_values = [[0.02, 0.05, 0.1, 0.2, 0.4, 0.8], [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]]
     #param_done =   [[1,       1,   1,   1,   0,   0], [  1,   1,   1,   1,   0,    0]]
     param_values = [[0.02, 0.05, 0.1, 0.2], [0.5, 1.0, 2.0, 4.0]]
-    param_done =   [[1,       1,   1,   1], [  1,   1,   1,   1]]
+    #param_done =   [[1,       1,   1,   1], [  1,   1,   1,   1]]
 elif distill_type == 'pkt':
     param_names = ['beta']
     param_values = [[0.75e4, 1.5e4, 3e4, 6e4, 12e4, 24e4, 48e4, 96e4]]
-    param_done = [[1,         1,     1,   1,    1,   0,    0,    0  ]]
+    #param_done = [[1,         1,     1,   1,    1,   0,    0,    0  ]]
 elif distill_type == 'similarity':
     param_names = ['beta']
     param_values = [[0.75e3, 1.5e3, 3e3, 6e3, 12e3, 0.37e3, 0.18e3, 0.09e3]]
-    param_done = [[1,         1,     1,   1,    1,   0,    0,       0  ]]
+    #param_done = [[1,         1,     1,   1,    1,   0,    0,       0  ]]
 elif distill_type == 'vid':
     param_names = ['beta']
     param_values = [[0.25, 0.5, 1, 2, 4, 8, 16, 32]]
-    param_done = [[1,       1,  1, 1, 1, 0,  0,  0]]
+    #param_done = [[1,       1,  1, 1, 1, 0,  0,  0]]
 elif distill_type == 'attention':
     param_names = ['beta']
     param_values = [[0.25e3, 0.5e3, 1e3, 2e3, 4e3]]
 elif distill_type == 'nst':
     param_names = ['beta']
     param_values = [[12.5, 25, 50, 100, 200, 6, 3, 1.5]]
-    param_done = [[1,      1,   1,   1,   1, 0, 0,  0  ]]
+    #param_done = [[1,      1,   1,   1,   1, 0, 0,  0  ]]
 elif distill_type == 'hint':
     param_names = ['beta']
     param_values = [[12.5, 25, 50, 100, 200, 400, 800]]
-    param_done =  [[0,      0,   0,   0,   0,   0,  0]]
+    #param_done =  [[0,      0,   0,   0,   0,   0,  0]]
 elif distill_type == 'correlation':
     param_names = ['beta']
     param_values = [[0.25e-2, 0.5e-2, 1e-2, 2e-2, 4e-2, 8e-2, 16e-2, 32e-2]]
-    param_done =   [[0,            0,    0,    0,    0,    0,     0,     0]]
+    #param_done =   [[0,            0,    0,    0,    0,    0,     0,     0]]
 else:
     param_names = None
     param_values = None
@@ -79,7 +83,11 @@ if __name__ == '__main__':
     configs_num = functools.reduce(lambda x, y: x*y, A)
 
     CONFIGS = [x for x in hyper_gen()]
-    DONE = [x for x in done_gen()]
+
+    if param_done:
+        DONE = [x for x in done_gen()]
+    else:
+        DONE = [0 for 0 in CONFIGS]
 
     for i in range(len(CONFIGS)):
         elem = CONFIGS[i]
@@ -89,7 +97,14 @@ if __name__ == '__main__':
         print(cnt % configs_num)
         print(s)
         print(done)
-        cmd = 'python train_student.py --gpu %d --part 9 --distill %s --model_s MobileNetV2Trofim -r 1 -a 0 --epochs 100 --nce_k 4096 %s --prefix %s_tune/%s_per11_%d_ ' % (gpu, distill_type, s, distill_type, distill_type, cnt % configs_num)
+
+        common_cmd = 'python train_student.py --gpu %d --part 9 --distill %s -r 1 -a 0 --epochs 100 --nce_k 4096 %s' % (gpu, distill_type, s)
+
+        if ss == 'mobile':
+            cmd = common_cmd + ' --model_s MobileNetV2Trofim --prefix %s_tune/%s_per11_%d_ ' % (distill_type, distill_type, cnt % configs_num)
+        elif ss == 'shuffle'
+            cmd = common_cmd + ' --model_s ShuffleV2 --path_t shufflev2_teacher.pth --prefix shuffle/%s_tune/%s_per11_%d_' % (distill_type, distill_type, cnt % configs_num)
+
         print(cmd)
         if not is_dry_run and not done:
             os.system(cmd)
