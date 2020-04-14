@@ -44,6 +44,7 @@ def parse_option():
     parser.add_argument('--print_freq', type=int, default=100, help='print frequency')
     parser.add_argument('--tb_freq', type=int, default=500, help='tb frequency')
     parser.add_argument('--save_freq', type=int, default=40, help='save frequency')
+    parser.add_argument('--val_freq', type=int, default=1, help='save frequency')
     parser.add_argument('--batch_size', type=int, default=128, help='batch_size')
     parser.add_argument('--num_workers', type=int, default=8, help='num of workers to use')
     parser.add_argument('--epochs', type=int, default=240, help='number of training epochs')
@@ -184,15 +185,21 @@ def main():
     print(n_data)
 
     # model
-    if opt.path_t:
-        #model_t = load_teacher(opt.path_t, n_cls)
-        model_t_name = 'ShuffleV2'
-        model_t = model_dict[model_t_name](num_classes=n_cls)
-        model_t.load_state_dict(torch.load(opt.path_t))
-    else:
-        model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
-        model_t = MobileNetV2(num_classes = 100, first_stride = 1)
-        model_t.load_state_dict(torch.load(model_t_path))
+    for i in range(10):
+        try:
+            if opt.path_t:
+                #model_t = load_teacher(opt.path_t, n_cls)
+                model_t_name = 'ShuffleV2'
+                model_t = model_dict[model_t_name](num_classes=n_cls)
+                model_t.load_state_dict(torch.load(opt.path_t))
+            else:
+                model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
+                model_t = MobileNetV2(num_classes = 100, first_stride = 1)
+                model_t.load_state_dict(torch.load(model_t_path))
+
+            break
+        except:
+            time.sleep(0.1)
 
     if opt.model_s == 'MobileNetV2Trofim':
 
@@ -356,14 +363,20 @@ def main():
         wall_time += time2 - time1
         print('epoch {}, total time {:.2f}'.format(epoch, time2 - time1))
 
-        val_acc, val_acc_top5, val_loss = validate(val_loader, model_s, criterion_cls, opt)
-        test_acc, tect_acc_top5, test_loss = validate(test_loader, model_s, criterion_cls, opt)
+        if epoch % opt.val_freq  == 0:
+            val_acc, val_acc_top5, val_loss = validate(val_loader, model_s, criterion_cls, opt)
+            test_acc, tect_acc_top5, test_loss = validate(test_loader, model_s, criterion_cls, opt)
+            test_acc = test_acc.item()
+            val_acc = val_acc.item()
+        else:
+            val_acc, val_acc_top5, val_loss = 0,0,0
+            test_acc, tect_acc_top5, test_loss = 0,0,0
 
         history['test_loss'].append(test_loss)
-        history['test_acc'].append(test_acc.item())
+        history['test_acc'].append(test_acc)
 
         history['val_loss'].append(val_loss)
-        history['val_acc'].append(val_acc.item())
+        history['val_acc'].append(val_acc)
 
         history['wall_time'].append(wall_time)
 
