@@ -17,7 +17,10 @@ def hyper_gen():
     configs[0] = ['--arc %d' % arc for arc in range(20)]
 
     for i in range(len(param_names)):
-        configs[i+1] = ['--%s %f' % (param_names[i], param_values[i][j]) for j in range(len(param_values[i]))]
+        if param_names[i]:
+            configs[i+1] = ['--%s %f' % (param_names[i], param_values[i][j]) for j in range(len(param_values[i]))]
+        else:
+            configs[i+1] = param_values[i]
 
     return itertools.product(*configs)
 
@@ -27,7 +30,10 @@ def done_gen():
     configs[0] = ['--arc %d' % arc for arc in range(20)]
 
     for i in range(len(param_names)):
-        configs[i+1] = [param_done[i][j] for j in range(len(param_values[i]))]
+        if param_names[i]:
+            configs[i+1] = [param_done[i][j] for j in range(len(param_values[i]))]
+        else:
+            configs[i+1] = param_values[i]
 
     return itertools.product(*configs)
 
@@ -36,8 +42,13 @@ param_values = None
 param_done = None
 
 if distill_type == 'kd':
-    param_names = ['kd_T', 'alpha']
-    param_values = [[1, 4, 16, 32], [0.25, 0.5, 0.75, 1.0]]
+    param_names = ['kd_T', None]
+    param_values = [[1, 4, 16, 32],
+        ['--gamma 0.75 --alpha 0.25',
+        '--gamma 0.50 --alpha 0.50',
+        '--gamma 0.25 --alpha 0.75',
+        '--gamma 0.00 --alpha 1.00']]
+
 elif distill_type == 'crd':
     param_names = ['nce_t', 'beta']
     #param_values = [[0.02, 0.05, 0.1, 0.2, 0.4, 0.8], [0.5, 1.0, 2.0, 4.0, 8.0, 16.0]]
@@ -106,7 +117,12 @@ if __name__ == '__main__':
         print(s)
         print(done)
 
-        common_cmd = 'python train_student.py --gpu %d --part 9 --distill %s -r 1 -a 0 --epochs 100 --nce_k 4096 %s' % (gpu, distill_type, s)
+        common_cmd = 'python train_student.py --gpu %d --part 9 --distill %s --epochs 100 --nce_k 4096 %s' % (gpu, distill_type, s)
+
+        if distill_type == 'kd':
+            common_cmd += ' --beta 0'
+        else:
+            common_cmd += ' -r 1 -a 0'
 
         if ss == 'mobile':
             cmd = common_cmd + ' --model_s MobileNetV2Trofim --prefix %s_tune/%s_per11_%d_ ' % (distill_type, distill_type, cnt % configs_num)
