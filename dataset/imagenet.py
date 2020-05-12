@@ -9,27 +9,50 @@ import numpy as np
 from torch.utils.data import DataLoader
 from torchvision import datasets
 from torchvision import transforms
+import torch
 
+class ImageFolderBackCompat(datasets.ImageFolder):
+     """
+     CIFAR100Instance+Sample Dataset
+     """
+
+     #@property
+     #def train_labels(self):
+     #    return self.targets
+
+     #@property
+     #def test_labels(self):
+     #    return self.targets
+
+     #@property
+     #def train_data(self):
+     #    return self.data
+
+     #@property
+     #def test_data(self):
+     #    return self.data
 
 def get_data_folder():
     """
     return server-dependent path to store the data
     """
-    hostname = socket.gethostname()
-    if hostname.startswith('visiongpu'):
-        data_folder = '/data/vision/phillipi/rep-learn/datasets/imagenet'
-    elif hostname.startswith('yonglong-home'):
-        data_folder = '/home/yonglong/Data/data/imagenet'
-    else:
-        data_folder = './data/imagenet'
 
-    if not os.path.isdir(data_folder):
-        os.makedirs(data_folder)
+    return '/home/trofim/imagenet/ILSVRC/Data/CLS-LOC'
 
-    return data_folder
+    #hostname = socket.gethostname()
+    #if hostname.startswith('visiongpu'):
+    #    data_folder = '/data/vision/phillipi/rep-learn/datasets/imagenet'
+    #elif hostname.startswith('yonglong-home'):
+    #    data_folder = '/home/yonglong/Data/data/imagenet'
+    #else:
+    #    data_folder = './data/imagenet'
+    #
+    #if not os.path.isdir(data_folder):
+    #    os.makedirs(data_folder)
+    #
+    #return data_folder
 
-
-class ImageFolderInstance(datasets.ImageFolder):
+class ImageFolderInstance(ImageFolderBackCompat):
     """: Folder datasets which returns the index of the image as well::
     """
     def __getitem__(self, index):
@@ -48,8 +71,7 @@ class ImageFolderInstance(datasets.ImageFolder):
 
         return img, target, index
 
-
-class ImageFolderSample(datasets.ImageFolder):
+class ImageFolderSample(ImageFolderBackCompat):
     """: Folder datasets which returns (img, label, index, contrast_index):
     """
     def __init__(self, root, transform=None, target_transform=None,
@@ -183,7 +205,7 @@ def get_dataloader_sample(dataset='imagenet', batch_size=128, num_workers=8, is_
     return train_loader, test_loader, len(train_set), len(train_set.classes)
 
 
-def get_imagenet_dataloader(dataset='imagenet', batch_size=128, num_workers=16, is_instance=False):
+def get_imagenet_dataloader(dataset='imagenet', batch_size=128, num_workers=16, is_instance=False, part = 1):
     """
     Data Loader for imagenet
     """
@@ -216,13 +238,35 @@ def get_imagenet_dataloader(dataset='imagenet', batch_size=128, num_workers=16, 
     else:
         train_set = datasets.ImageFolder(train_folder, transform=train_transform)
 
-    test_set = datasets.ImageFolder(test_folder, transform=test_transform)
+    #
+    #
+    #
+    n_train = len(train_set)
+    split = n_train - 50000
+    n_data = split//part
+
+    np.random.seed(2)
+    indices = list(range(n_train))
+    np.random.shuffle(indices)
+
+    val_set = ImageFolderInstance(train_folder, transform = test_transform)
+    val_set = torch.utils.data.Subset(val_set, indices[split:])
+
+    test_set = ImageFolderInstance(test_folder, transform = test_transform)
+
+    train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:n_data])
 
     train_loader = DataLoader(train_set,
                               batch_size=batch_size,
-                              shuffle=True,
+                              sampler=train_sampler,
                               num_workers=num_workers,
                               pin_memory=True)
+
+    val_loader = DataLoader(val_set,
+                             batch_size=batch_size,
+                             shuffle=False,
+                             num_workers=num_workers//2,
+                             pin_memory=True)
 
     test_loader = DataLoader(test_set,
                              batch_size=batch_size,
@@ -231,6 +275,6 @@ def get_imagenet_dataloader(dataset='imagenet', batch_size=128, num_workers=16, 
                              pin_memory=True)
 
     if is_instance:
-        return train_loader, test_loader, n_data
+        return train_loader, val_loader, test_loader, n_data
     else:
-        return train_loader, test_loader
+        return train_loader, val_loader, test_loader
