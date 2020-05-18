@@ -43,21 +43,21 @@ class CIFAR100BackCompat(datasets.CIFAR100):
      CIFAR100Instance+Sample Dataset
      """
 
-     @property
-     def train_labels(self):
-         return self.targets
+     #@property
+     #def train_labels(self):
+     #    return self.targets
 
-     @property
-     def test_labels(self):
-         return self.targets
+     #@property
+     #def test_labels(self):
+     #    return self.targets
 
-     @property
-     def train_data(self):
-         return self.data
+     #@property
+     #def train_data(self):
+     #    return self.data
 
-     @property
-     def test_data(self):
-         return self.data
+     #@property
+     #def test_data(self):
+     #    return self.data
 
 class CIFAR100Instance(CIFAR100BackCompat):
     """CIFAR100Instance Dataset.
