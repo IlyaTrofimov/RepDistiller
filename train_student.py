@@ -398,6 +398,27 @@ def main():
     history = {"loss": [], "acc": [], "test_loss": [], "test_acc": [], "wall_time" : [], "val_loss" : [], "val_acc" : []}
     wall_time = 0.0
 
+    def save_chechpoint(opt, model_s, optimizer, history):
+        if opt.arc is None:
+            path = '%s/%s_None' % (opt.res_dir, opt.prefix)
+        else:
+            path = '%s/%s_%d' % (opt.res_dir, opt.prefix, opt.arc)
+
+        path = pathlib.Path(path)
+
+        if not os.path.exists(path.parent):
+            os.makedirs(path.parent)
+
+        model_path = path.with_suffix(".pth")
+        optimizer_path = path.with_name(path.name + "_optimizer").with_suffix(".json")
+        history_path = path.with_name(path.name + "_history").with_suffix(".json")
+
+        torch.save(model_s.state_dict(), model_path)
+        torch.save(optimizer.state_dict(), optimizer_path)
+
+        with open(history_path, 'w') as f:
+            f.write(json.dumps(history))
+
     # routine
     for epoch in range(1, opt.epochs + 1):
 
@@ -451,26 +472,15 @@ def main():
         #    save_file = os.path.join(opt.save_folder, 'ckpt_epoch_{epoch}.pth'.format(epoch=epoch))
         #    torch.save(state, save_file)
 
+        if epoch % opt.val_freq  == 0:
+            if opt.dataset == 'imagenet':
+                save_chechpoint(opt, model_s, optimizer, history)
+
+    save_chechpoint(opt, model_s, optimizer, history)
+
     # This best accuracy is only for printing purpose.
     # The results reported in the paper/README is from the last epoch.
     #print('best accuracy:', best_acc)
-
-    if opt.arc is None:
-        path = '%s/%s_None' % (opt.res_dir, opt.prefix)
-    else:
-        path = '%s/%s_%d' % (opt.res_dir, opt.prefix, opt.arc)
-
-    path = pathlib.Path(path)
-
-    if not os.path.exists(path.parent):
-        os.makedirs(path.parent)
-
-    model_path = path.with_suffix(".pth")
-    history_path = path.with_name(path.name + "_history").with_suffix(".json")
-
-    torch.save(model_s.state_dict(), model_path)
-    with open(history_path, 'w') as f:
-        f.write(json.dumps(history))
 
     # save model
     #state = {
