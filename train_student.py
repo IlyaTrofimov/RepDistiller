@@ -17,12 +17,14 @@ import torch
 import torch.optim as optim
 import torch.nn as nn
 import torch.backends.cudnn as cudnn
+import torchvision
 
 from models import model_dict
 from models.util import Embed, ConvReg, LinearEmbed
 from models.util import Connector, Translator, Paraphraser
 
 from dataset.cifar100 import get_cifar100_dataloaders, get_cifar100_dataloaders_sample
+from dataset.imagenet import get_imagenet_dataloader
 
 from helper.util import adjust_learning_rate
 
@@ -58,7 +60,7 @@ def parse_option():
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 
     # dataset
-    parser.add_argument('--dataset', type=str, default='cifar100', choices=['cifar100'], help='dataset')
+    parser.add_argument('--dataset', type=str, default='cifar100', choices=['cifar100', 'imagenet'], help='dataset')
 
     # model
     parser.add_argument('--model_s', type=str, default='MobileNetV2Trofim',
@@ -92,7 +94,7 @@ def parse_option():
     parser.add_argument('--hint_layer', default=2, type=int, choices=[0, 1, 2, 3, 4])
 
     # trofim options
-    parser.add_argument('--gpu', default=0, type=int)
+    parser.add_argument('--gpu', default=None, type=int)
     parser.add_argument('--prefix', default=None, type=str, help='log prefix')
     parser.add_argument('--arc', default=None, type=int)
     parser.add_argument('--part', default=1, type=int)
@@ -143,7 +145,6 @@ def get_teacher_name(model_path):
     else:
         return segments[0] + '_' + segments[1] + '_' + segments[2]
 
-
 def load_teacher(model_path, n_cls):
     print('==> loading teacher model')
     model_t = get_teacher_name(model_path)
@@ -152,6 +153,7 @@ def load_teacher(model_path, n_cls):
     print('==> done')
     return model
 
+#def model_wrapper
 
 def main():
     best_acc = 0
@@ -165,7 +167,11 @@ def main():
     seed = 8
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    torch.cuda.set_device(opt.gpu)
+
+    print(opt.gpu)
+
+    if not (opt.gpu is None):
+        torch.cuda.set_device(opt.gpu)
 
     # dataloader
     if opt.dataset == 'cifar100':
@@ -179,38 +185,62 @@ def main():
                                                                         num_workers=opt.num_workers,
                                                                         is_instance=True, part = opt.part)
         n_cls = 100
+    elif opt.dataset == 'imagenet':
+        if opt.distill in ['crd']:
+            pass
+        else:
+            train_loader, val_loader, test_loader, n_data = get_imagenet_dataloader(batch_size=opt.batch_size,
+                                                                        num_workers=opt.num_workers,
+                                                                        is_instance=True, part = opt.part)
+        n_cls = 1000
+
     else:
         raise NotImplementedError(opt.dataset)
 
     print(n_data)
 
+    #
     # model
+    # LOAD TEACHER
     for i in range(10):
         try:
-            if opt.path_t:
-                #model_t = load_teacher(opt.path_t, n_cls)
-                model_t_name = 'ShuffleV2'
-                model_t = model_dict[model_t_name](num_classes=n_cls)
-                model_t.load_state_dict(torch.load(opt.path_t))
+            if opt.dataset == 'cifar100':
+                if opt.path_t:
+                    #model_t = load_teacher(opt.path_t, n_cls)
+                    model_t_name = 'ShuffleV2'
+                    model_t = model_dict[model_t_name](num_classes=n_cls)
+                    model_t.load_state_dict(torch.load(opt.path_t))
+                else:
+                    model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
+                    model_t = MobileNetV2(num_classes = 100, first_stride = 1)
+                    model_t.load_state_dict(torch.load(model_t_path))
             else:
-                model_t_path = '/home/trofim/NAS/KnowledgeDistillation/data2/models/cifar100/donor7.pth'
-                model_t = MobileNetV2(num_classes = 100, first_stride = 1)
-                model_t.load_state_dict(torch.load(model_t_path))
-
+                    model_t_path = 'mobile_imagenet.pth'
+                    model_t = MobileNetV2(num_classes = n_cls, width_mult = 0.5)
+                    model_t.load_state_dict(torch.load(model_t_path))
             break
         except:
             time.sleep(0.1)
 
+    if opt.dataset == 'cifar100':
+        first_stride = 1
+    else:
+        first_stride = 2
+
     if opt.model_s == 'MobileNetV2Trofim':
 
-        with open(opt.arcs_dir + '/random_arcs2.pickle', 'rb') as infile:
-            obj = pickle.load(infile)
+        if not (opt.arc is None):
+            with open(opt.arcs_dir + '/random_arcs2.pickle', 'rb') as infile:
+                obj = pickle.load(infile)
 
-        arcs = obj[0:100]
+            arcs = obj[0:100]
 
-        arc = arcs[opt.arc]
-        model_s = MobileNetV2(num_classes = 100, first_stride = 1,\
+            arc = arcs[opt.arc]
+            model_s = MobileNetV2(num_classes = n_cls, first_stride = first_stride,\
                                     inverted_residual_setting = arc[:-1], last_channel = arc[-1][1])
+        else:
+            model_s = MobileNetV2(num_classes = n_cls, first_stride = first_stride)
+
     elif opt.model_s == 'ShuffleV2':
 
         with open(opt.arcs_dir + '/random_arcs_shufflenetv2.pickle', 'rb') as infile:
@@ -224,11 +254,25 @@ def main():
     else:
         model_s = model_dict[opt.model_s](num_classes=n_cls)
 
+    #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
     data = torch.randn(2, 3, 32, 32)
     model_t.eval()
     model_s.eval()
-    feat_t, _ = model_t(data, is_feat=True)
+
+    if opt.alpha == 0 and opt.beta == 0:
+        feat_t = []
+    else:
+        feat_t, _ = model_t(data, is_feat=True)
     feat_s, _ = model_s(data, is_feat=True)
+
+    #
+    # Data Parallel
+    #
+    if opt.gpu is None:
+        model_s = torch.nn.DataParallel(model_s).cuda()
+
+    #model_s.to(device)
 
     module_list = nn.ModuleList([])
     module_list.append(model_s)
@@ -332,7 +376,11 @@ def main():
     #                      momentum=opt.momentum,
     #                      weight_decay=opt.weight_decay)
 
-    optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 5e-4)
+    if opt.dataset == 'cifar100':
+        optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 5e-4)
+    else:
+        optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 1e-4)
+
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.epochs)
 
     # append teacher after optimizer to avoid weight_decay

@@ -119,7 +119,7 @@ class MobileNetV2(nn.Module):
             idx += 1
         # building last several layers
         features.append(ConvBNReLU(input_channel, self.last_channel, kernel_size=1))
-        self.list_features = copy(features)
+        #self.list_features = nn.ModuleList(features)
         # make it nn.Sequential
         self.features = nn.Sequential(*features)
 
@@ -148,17 +148,17 @@ class MobileNetV2(nn.Module):
 
         kd_layers = []
 
-        for i in range(len(self.list_features)):
-            x = self.list_features[i](x)
+        for i in range(len(self.features)):
+            x = self.features[i](x)
 
             if i in [0, 2, 3, 5, 7]:
                 kd_layers.append(x)
 
-        #x = self.features(x)
+        ###x = self.features(x)
         f5 = x.mean([2, 3])
         out = self.classifier(f5)
-
-        kd_layers.append(f5)
+        #
+        #kd_layers.append(f5)
 
         if is_feat:
             return kd_layers, out
