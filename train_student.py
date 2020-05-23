@@ -379,7 +379,7 @@ def main():
     if opt.dataset == 'cifar100':
         optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 5e-4)
     else:
-        optimizer = optim.SGD(trainable_list.parameters(), lr=1e-1, momentum=0.9, weight_decay = 1e-4)
+        optimizer = optim.SGD(trainable_list.parameters(), lr=0.05, momentum=0.9, weight_decay = 4e-5)
 
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.epochs)
 
@@ -410,7 +410,7 @@ def main():
             os.makedirs(path.parent)
 
         model_path = path.with_suffix(".pth")
-        optimizer_path = path.with_name(path.name + "_optimizer").with_suffix(".json")
+        optimizer_path = path.with_name(path.name + "_optimizer").with_suffix(".pth")
         history_path = path.with_name(path.name + "_history").with_suffix(".json")
 
         torch.save(model_s.state_dict(), model_path)

@@ -37,7 +37,7 @@ def get_data_folder():
     return server-dependent path to store the data
     """
 
-    return '/home/trofim/imagenet/ILSVRC/Data/CLS-LOC'
+    return '/gpfs/data/home/i.trofimov/imagenet/ILSVRC/Data/CLS-LOC'
 
     #hostname = socket.gethostname()
     #if hostname.startswith('visiongpu'):
@@ -242,37 +242,46 @@ def get_imagenet_dataloader(dataset='imagenet', batch_size=128, num_workers=16, 
     #
     #
     n_train = len(train_set)
-    split = n_train - 50000
+    #split = n_train - 50000
+    split = n_train
     n_data = split//part
 
-    np.random.seed(2)
-    indices = list(range(n_train))
-    np.random.shuffle(indices)
+    #np.random.seed(2)
+    #indices = list(range(n_train))
+    #np.random.shuffle(indices)
 
-    val_set = ImageFolderInstance(train_folder, transform = test_transform)
-    val_set = torch.utils.data.Subset(val_set, indices[split:])
+    #val_set = ImageFolderInstance(train_folder, transform = test_transform)
+    #val_set = torch.utils.data.Subset(val_set, indices[split:])
 
     test_set = ImageFolderInstance(test_folder, transform = test_transform)
 
-    train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:n_data])
+    #train_sampler = torch.utils.data.sampler.SubsetRandomSampler(indices[:n_data])
 
     train_loader = DataLoader(train_set,
                               batch_size=batch_size,
-                              sampler=train_sampler,
+                              shuffle=True,
                               num_workers=num_workers,
                               pin_memory=True)
 
-    val_loader = DataLoader(val_set,
-                             batch_size=batch_size,
-                             shuffle=False,
-                             num_workers=num_workers//2,
-                             pin_memory=True)
+    #train_loader = DataLoader(train_set,
+    #                          batch_size=batch_size,
+    #                          sampler=train_sampler,
+    #                          num_workers=num_workers,
+    #                          pin_memory=True)
+
+    #val_loader = DataLoader(val_set,
+    #                         batch_size=batch_size,
+    #                         shuffle=False,
+    #                         num_workers=num_workers//2,
+    #                         pin_memory=True)
 
     test_loader = DataLoader(test_set,
                              batch_size=batch_size,
                              shuffle=False,
                              num_workers=num_workers//2,
                              pin_memory=True)
+
+    val_loader = test_loader
 
     if is_instance:
         return train_loader, val_loader, test_loader, n_data
